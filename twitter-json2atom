@@ -1,0 +1,76 @@
+#!/bin/env perl
+
+use strict;
+use warnings;
+use 5.010;
+
+use Net::Twitter;
+use DateTime;
+use DateTime::Format::Strptime;
+use XML::Feed;
+
+my $screen = shift || 'davorg';
+
+my $nt = Net::Twitter->new(
+    ssl             => 1,
+    traits          => [qw/API::RESTv1_1 OAuth/],
+    consumer_key    => $ENV{TWITTER_CONS_KEY},
+    consumer_secret => $ENV{TWITTER_CONS_SECRET},
+);
+
+my $dp = DateTime::Format::Strptime->new(
+  pattern => '%a %b %d %H:%M:%S %z %Y',
+);
+
+# You'll save the token and secret in cookie, config file or session database
+my($access_token, $access_token_secret) = restore_tokens();
+if ($access_token && $access_token_secret) {
+  $nt->access_token($access_token);
+  $nt->access_token_secret($access_token_secret);
+}
+          
+unless ( $nt->authorized ) {
+  # The client is not yet authorized: Do it now
+  print "Authorize this app at ", $nt->get_authorization_url,
+        " and enter the PIN#\n";
+                   
+  my $pin = <STDIN>; # wait for input
+  chomp $pin;
+                            
+  my($access_token, $access_token_secret, $user_id, $screen_name) =
+    $nt->request_access_token(verifier => $pin);
+  save_tokens($access_token, $access_token_secret); # if necessary
+}
+
+my $atom = XML::Feed->new('Atom');
+$atom->title("\@$screen on Twitter");
+$atom->link("https://twitter.com/$screen");
+$atom->modified(DateTime->now);
+
+my $ret = $nt->user_timeline({screen_name => $screen});
+
+foreach (@$ret) {
+  my $entry = XML::Feed::Entry->new('Atom');
+  $entry->title($_->{text});
+  $entry->link("https://twitter.com/$screen/status/$_->{id_str}");
+  $entry->content($_->{text});
+  $entry->modified($dp->parse_datetime($_->{created_at}));
+  $atom->add_entry($entry);
+}
+
+say $atom->as_xml;
+
+sub restore_tokens {
+  return () unless -e "$ENV{HOME}/.twjsonrc";
+  open my $tok_fh, '<', "$ENV{HOME}/.twjsonrc" or die $!;
+  chomp(my @toks = <$tok_fh>);
+  return @toks;
+}
+
+sub save_tokens {
+  my @toks = @_;
+
+  open my $tok_fh, '>', "$ENV{HOME}/.twjsonrc" or die $!;
+
+  print $tok_fh map { "$_\n" } @toks;
+}
