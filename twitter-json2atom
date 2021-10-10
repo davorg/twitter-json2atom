@@ -65,15 +65,15 @@ $atom->modified(DateTime->now);
 my $ret;
 
 if ($search) {
-  $ret = $twitter->search($string);
+  $ret = $twitter->search($string, { tweet_mode => 'extended' });
   $ret = $ret->{statuses};
 } else {
-  $ret = $twitter->user_timeline({screen_name => $string});
+  $ret = $twitter->user_timeline({screen_name => $string}, { tweet_mode => 'extended' });
 }
 
 foreach (@$ret) {
   my $entry = XML::Feed::Entry->new('Atom');
-  $entry->title($_->{text});
+  $entry->title($_->{full_text} // $_->{text});
   $entry->link("https://twitter.com/$string/status/$_->{id_str}");
   $entry->content($_->{text});
   $entry->modified($dp->parse_datetime($_->{created_at}));
