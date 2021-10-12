@@ -15,9 +15,18 @@ if (grep { ! defined $ENV{$_} } @env_vars) {
   die "Please set environment variables: ", join(', ', @env_vars), "\n";
 }
 
-my $string = shift || '@davorg';
+my ($username, $search_string, $is_search);
 
-my $search = $string !~ /^@/;
+if (@ARGV) {
+  if ($ARGV[0] =~ /^@/) {
+    $username = shift;
+  } else {
+    $search_string = shift;
+    $is_search = 1;
+  }
+} else {
+  $username = '@davorg';
+}
 
 my $twitter = Twitter::API->new_with_traits(
     traits          => [qw/Migration ApiMethods/],
@@ -48,12 +57,12 @@ if ($access_token && $access_token_secret) {
 }
 
 my ($title, $link);
-if ($search) {
-  $title = "Search for $string on Twitter";
-  $link  = "https://twitter.com/search?q=$string";
+if ($is_search) {
+  $title = "Search for $search_string on Twitter";
+  $link  = "https://twitter.com/search?q=$search_string";
 } else {
-  $title = "$string on Twitter";
-  my $user = $string =~ s/^\@//r;
+  $title = "$username on Twitter";
+  my $user = $username =~ s/^\@//r;
   $link  = "https://twitter.com/$user";
 }
 
@@ -64,11 +73,11 @@ $atom->modified(DateTime->now);
 
 my $ret;
 
-if ($search) {
-  $ret = $twitter->search($string, { tweet_mode => 'extended' });
+if ($is_search) {
+  $ret = $twitter->search($search_string, { tweet_mode => 'extended' });
   $ret = $ret->{statuses};
 } else {
-  $ret = $twitter->user_timeline({screen_name => $string}, { tweet_mode => 'extended' });
+  $ret = $twitter->user_timeline({screen_name => $username}, { tweet_mode => 'extended' });
 }
 
 foreach (@$ret) {
