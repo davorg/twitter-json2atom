@@ -84,7 +84,7 @@ foreach (@$ret) {
   my $entry = XML::Feed::Entry->new('Atom');
   $entry->title($_->{full_text} // $_->{text});
   $entry->link("https://twitter.com/$_->{user}{screen_name}/status/$_->{id_str}");
-  $entry->content($_->{text});
+  $entry->content($_->{full_text} // $_->{text});
   $entry->modified($dp->parse_datetime($_->{created_at}));
   $atom->add_entry($entry);
 }
